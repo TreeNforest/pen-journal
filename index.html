@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>筆藏 · Nib</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@18.2.0",
+    "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+    "firebase/app": "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js",
+    "firebase/firestore": "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js"
+  }
+}
+</script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+<style>
+  :root {
+    --paper: #F6F1E7;
+    --paper-raised: #FDFBF6;
+    --line: #E4DBC8;
+    --ink: #21262B;
+    --ink-soft: #6B6255;
+    --vermilion: #C1432E;
+    --cobalt: #2E5C8A;
+    --ochre: #B9871F;
+    --wishlist-bg: #F1EAD9;
+    --shadow: 0 1px 2px rgba(33,38,43,0.06), 0 4px 14px rgba(33,38,43,0.05);
+    --radius: 14px;
+  }
+  html.dark {
+    --paper: #171512;
+    --paper-raised: #211E1A;
+    --line: #35302A;
+    --ink: #EDE6D6;
+    --ink-soft: #A79E8E;
+    --vermilion: #E3705C;
+    --cobalt: #6FA0D4;
+    --ochre: #D9A94A;
+    --wishlist-bg: #262019;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 4px 16px rgba(0,0,0,0.35);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'Inter', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    transition: background 0.2s ease, color 0.2s ease;
+  }
+  .display { font-family: 'Fraunces', serif; }
+  .mono { font-family: 'IBM Plex Mono', monospace; }
+
+  #root { min-height: 100vh; }
+
+  .topbar {
+    position: sticky; top: 0; z-index: 20;
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 16px;
+    background: var(--paper);
+    border-bottom: 1px solid var(--line);
+  }
+  .topbar h1 {
+    margin: 0; font-size: 22px; font-weight: 600; letter-spacing: 0.2px;
+    flex: 1;
+  }
+  .icon-btn {
+    display: flex; align-items: center; justify-content: center;
+    width: 38px; height: 38px; border-radius: 10px;
+    border: 1px solid var(--line); background: var(--paper-raised);
+    color: var(--ink); cursor: pointer; font-size: 17px;
+    transition: transform 0.15s ease, background 0.15s ease;
+  }
+  .icon-btn:active { transform: scale(0.93); }
+
+  .search-row {
+    display: flex; gap: 8px; padding: 10px 16px;
+    border-bottom: 1px solid var(--line);
+    overflow-x: auto;
+  }
+  .search-input {
+    flex: 1; min-width: 0;
+    padding: 9px 12px; border-radius: 10px;
+    border: 1px solid var(--line); background: var(--paper-raised);
+    color: var(--ink); font-family: inherit; font-size: 14px;
+  }
+  .chip {
+    flex-shrink: 0;
+    padding: 7px 13px; border-radius: 999px;
+    border: 1px solid var(--line); background: var(--paper-raised);
+    color: var(--ink-soft); font-size: 13px; cursor: pointer;
+    white-space: nowrap;
+  }
+  .chip.active { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+
+  .layout { display: flex; }
+
+  .drawer-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 29;
+  }
+  .drawer {
+    position: fixed; top: 0; left: 0; bottom: 0; width: 78vw; max-width: 300px;
+    background: var(--paper); border-right: 1px solid var(--line);
+    z-index: 30; overflow-y: auto; padding: 16px 12px;
+  }
+  .drawer-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 4px 8px 14px;
+  }
+  .drawer-header h2 { margin: 0; font-size: 16px; font-weight: 600; }
+
+  .cat-node { margin: 2px 0; }
+  .cat-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 10px; border-radius: 10px; cursor: pointer;
+    font-size: 14.5px; color: var(--ink);
+  }
+  .cat-row:hover { background: var(--paper-raised); }
+  .cat-row.selected { background: var(--ink); color: var(--paper); }
+  .cat-swatch {
+    width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0;
+  }
+  .cat-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cat-count { font-size: 11px; opacity: 0.6; }
+  .cat-children { margin-left: 16px; border-left: 1px dashed var(--line); padding-left: 6px; }
+  .cat-add-row {
+    display: flex; align-items: center; gap: 6px;
+    padding: 8px 10px; margin-top: 6px; border-radius: 10px;
+    color: var(--ink-soft); font-size: 13.5px; cursor: pointer;
+    border: 1px dashed var(--line);
+  }
+
+  .main { flex: 1; min-width: 0; padding: 16px; padding-bottom: 100px; }
+
+  .grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 12px;
+  }
+  .item-card {
+    position: relative;
+    background: var(--paper-raised);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 14px 14px 12px 18px;
+    cursor: pointer;
+    overflow: hidden;
+  }
+  .item-card.wishlist { background: var(--wishlist-bg); border-style: dashed; }
+  .ink-stripe {
+    position: absolute; left: 0; top: 0; bottom: 0; width: 6px;
+  }
+  .item-name { font-weight: 600; font-size: 15px; margin: 0 0 4px; line-height: 1.3; }
+  .item-meta { font-size: 12px; color: var(--ink-soft); margin: 0; }
+  .item-meta.mono { margin-top: 6px; font-size: 11.5px; }
+  .wishlist-tag {
+    display: inline-block; margin-top: 8px; font-size: 10.5px;
+    padding: 2px 7px; border-radius: 999px; background: var(--ink); color: var(--paper);
+    letter-spacing: 0.3px;
+  }
+
+  .empty-state {
+    text-align: center; padding: 60px 20px; color: var(--ink-soft);
+  }
+  .empty-state .display { font-size: 20px; color: var(--ink); margin-bottom: 6px; }
+
+  .fab {
+    position: fixed; right: 18px; bottom: 24px; z-index: 15;
+    width: 56px; height: 56px; border-radius: 50%;
+    background: var(--ink); color: var(--paper);
+    border: none; font-size: 26px; cursor: pointer;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.25);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .fab:active { transform: scale(0.94); }
+
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(20,18,15,0.45);
+    z-index: 40; display: flex; align-items: flex-end; justify-content: center;
+  }
+  .modal {
+    width: 100%; max-width: 480px; max-height: 88vh; overflow-y: auto;
+    background: var(--paper); border-radius: 20px 20px 0 0;
+    padding: 20px 20px 28px;
+  }
+  @media (min-width: 640px) {
+    .modal-overlay { align-items: center; }
+    .modal { border-radius: 18px; max-height: 80vh; }
+  }
+  .modal h2 { margin: 0 0 16px; font-size: 19px; }
+  .field { margin-bottom: 14px; }
+  .field label {
+    display: block; font-size: 12.5px; color: var(--ink-soft); margin-bottom: 5px;
+    font-weight: 500;
+  }
+  .field input[type=text], .field input[type=number], .field input[type=date],
+  .field select, .field textarea {
+    width: 100%; padding: 10px 12px; border-radius: 10px;
+    border: 1px solid var(--line); background: var(--paper-raised); color: var(--ink);
+    font-family: inherit; font-size: 14.5px;
+  }
+  .field textarea { resize: vertical; min-height: 60px; }
+  .color-row { display: flex; align-items: center; gap: 10px; }
+  .color-row input[type=color] {
+    width: 44px; height: 40px; border-radius: 10px; border: 1px solid var(--line);
+    padding: 2px; background: var(--paper-raised);
+  }
+  .status-toggle { display: flex; gap: 8px; }
+  .status-toggle button {
+    flex: 1; padding: 10px; border-radius: 10px; border: 1px solid var(--line);
+    background: var(--paper-raised); color: var(--ink-soft); font-size: 13.5px; cursor: pointer;
+  }
+  .status-toggle button.active { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+
+  .modal-actions { display: flex; gap: 10px; margin-top: 18px; }
+  .btn {
+    flex: 1; padding: 12px; border-radius: 10px; border: none;
+    font-size: 14.5px; font-weight: 600; cursor: pointer;
+  }
+  .btn-primary { background: var(--ink); color: var(--paper); }
+  .btn-ghost { background: transparent; color: var(--ink-soft); border: 1px solid var(--line); }
+  .btn-danger { background: transparent; color: var(--vermilion); border: 1px solid var(--vermilion); }
+
+  ::-webkit-scrollbar { width: 0; height: 0; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" data-type="module">
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { createRoot } from 'react-dom/client';
+import { initializeApp } from 'firebase/app';
+import {
+  getFirestore, collection, doc, onSnapshot, addDoc, updateDoc, deleteDoc,
+  setDoc, getDoc, serverTimestamp, query, orderBy
+} from 'firebase/firestore';
+
+// ---- Firebase config: 請換成你自己在 Firebase console 建立的新專案設定 ----
+const firebaseConfig = {
+  apiKey: "AIzaSyCyREDMu5Ej0uPAEvKcoYmL48c_9n_ygzs",
+  authDomain: "pen-journal.firebaseapp.com",
+  projectId: "pen-journal",
+  storageBucket: "pen-journal.firebasestorage.app",
+  messagingSenderId: "728609195590",
+  appId: "1:728609195590:web:4331c189676d153f2dac47"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+const PEN_TYPES = ["原子筆", "鋼珠筆", "鋼筆", "色鉛筆", "麥克筆", "代針筆", "其他"];
+
+function flattenTree(categories, parentId = null, depth = 0) {
+  const children = categories.filter(c => c.parentId === parentId);
+  let out = [];
+  for (const c of children) {
+    out.push({ ...c, depth });
+    out = out.concat(flattenTree(categories, c.id, depth + 1));
+  }
+  return out;
+}
+
+function collectDescendantIds(categories, rootId) {
+  const ids = [rootId];
+  const children = categories.filter(c => c.parentId === rootId);
+  for (const c of children) ids.push(...collectDescendantIds(categories, c.id));
+  return ids;
+}
+
+function CategoryNode({ cat, categories, itemCounts, selectedId, onSelect, onAddChild, depth = 0 }) {
+  const children = categories.filter(c => c.parentId === cat.id);
+  const count = itemCounts[cat.id] || 0;
+  return (
+    <div className="cat-node">
+      <div
+        className={"cat-row" + (selectedId === cat.id ? " selected" : "")}
+        onClick={() => onSelect(cat.id)}
+      >
+        <span className="cat-swatch" style={{ background: cat.color || '#B9A98A' }}></span>
+        <span className="cat-name">{cat.name}</span>
+        {count > 0 && <span className="cat-count">{count}</span>}
+      </div>
+      {children.length > 0 && (
+        <div className="cat-children">
+          {children.map(child => (
+            <CategoryNode key={child.id} cat={child} categories={categories}
+              itemCounts={itemCounts} selectedId={selectedId} onSelect={onSelect}
+              onAddChild={onAddChild} depth={depth + 1} />
+          ))}
+        </div>
+      )}
+      <div className="cat-children">
+        <div className="cat-add-row" onClick={() => onAddChild(cat.id)}>
+          + 新增子分類
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CategoryForm({ initialParentId, categories, onSave, onClose }) {
+  const [name, setName] = useState('');
+  const [parentId, setParentId] = useState(initialParentId || null);
+  const [color, setColor] = useState('#B9A98A');
+  const flat = flattenTree(categories);
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
+        <h2 className="display">新增分類</h2>
+        <div className="field">
+          <label>分類名稱</label>
+          <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="例如：色鉛筆" />
+        </div>
+        <div className="field">
+          <label>上層分類</label>
+          <select value={parentId || ''} onChange={e => setParentId(e.target.value || null)}>
+            <option value="">（頂層分類）</option>
+            {flat.map(c => (
+              <option key={c.id} value={c.id}>{'　'.repeat(c.depth)}{c.name}</option>
+            ))}
+          </select>
+        </div>
+        <div className="field">
+          <label>標籤色</label>
+          <div className="color-row">
+            <input type="color" value={color} onChange={e => setColor(e.target.value)} />
+          </div>
+        </div>
+        <div className="modal-actions">
+          <button className="btn btn-ghost" onClick={onClose}>取消</button>
+          <button className="btn btn-primary" disabled={!name.trim()}
+            onClick={() => { onSave({ name: name.trim(), parentId, color }); }}>
+            儲存
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ItemForm({ item, categories, onSave, onDelete, onClose }) {
+  const flat = flattenTree(categories);
+  const [form, setForm] = useState(item || {
+    name: '', categoryId: flat[0]?.id || '', brand: '', colorHex: '#C1432E',
+    penType: PEN_TYPES[0], purchaseDate: '', price: '', store: '', notes: '',
+    status: 'owned'
+  });
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
+        <h2 className="display">{item ? '編輯項目' : '新增項目'}</h2>
+
+        <div className="field">
+          <label>狀態</label>
+          <div className="status-toggle">
+            <button className={form.status === 'owned' ? 'active' : ''} onClick={() => set('status', 'owned')}>已收藏</button>
+            <button className={form.status === 'wishlist' ? 'active' : ''} onClick={() => set('status', 'wishlist')}>願望清單</button>
+          </div>
+        </div>
+
+        <div className="field">
+          <label>名稱</label>
+          <input type="text" value={form.name} onChange={e => set('name', e.target.value)} placeholder="例如：Uni Jetstream 0.5 黑" />
+        </div>
+
+        <div className="field">
+          <label>顏色（墨色條會用這個顏色）</label>
+          <div className="color-row">
+            <input type="color" value={form.colorHex} onChange={e => set('colorHex', e.target.value)} />
+          </div>
+        </div>
+
+        <div className="field">
+          <label>分類</label>
+          <select value={form.categoryId} onChange={e => set('categoryId', e.target.value)}>
+            {flat.map(c => (
+              <option key={c.id} value={c.id}>{'　'.repeat(c.depth)}{c.name}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="field">
+          <label>類型</label>
+          <select value={form.penType} onChange={e => set('penType', e.target.value)}>
+            {PEN_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </div>
+
+        <div className="field">
+          <label>品牌</label>
+          <input type="text" value={form.brand} onChange={e => set('brand', e.target.value)} placeholder="例如：Uni、Zebra、Tombow" />
+        </div>
+
+        <div className="field">
+          <label>{form.status === 'wishlist' ? '預計價格' : '購入日期 / 價格'}</label>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {form.status === 'owned' && (
+              <input type="date" value={form.purchaseDate} onChange={e => set('purchaseDate', e.target.value)} style={{ flex: 1 }} />
+            )}
+            <input type="number" value={form.price} onChange={e => set('price', e.target.value)} placeholder="NT$" style={{ flex: 1 }} />
+          </div>
+        </div>
+
+        <div className="field">
+          <label>店家</label>
+          <input type="text" value={form.store} onChange={e => set('store', e.target.value)} placeholder="哪裡買的" />
+        </div>
+
+        <div className="field">
+          <label>備註</label>
+          <textarea value={form.notes} onChange={e => set('notes', e.target.value)} />
+        </div>
+
+        <div className="modal-actions">
+          {item && <button className="btn btn-danger" onClick={() => onDelete(item.id)}>刪除</button>}
+          <button className="btn btn-ghost" onClick={onClose}>取消</button>
+          <button className="btn btn-primary" disabled={!form.name.trim()} onClick={() => onSave(form)}>儲存</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function App() {
+  const [dark, setDark] = useState(false);
+  const [categories, setCategories] = useState([]);
+  const [items, setItems] = useState([]);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [selectedCat, setSelectedCat] = useState(null);
+  const [statusFilter, setStatusFilter] = useState('all'); // all | owned | wishlist
+  const [search, setSearch] = useState('');
+  const [editingItem, setEditingItem] = useState(null);
+  const [showItemForm, setShowItemForm] = useState(false);
+  const [showCatForm, setShowCatForm] = useState(false);
+  const [catFormParent, setCatFormParent] = useState(null);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', dark);
+  }, [dark]);
+
+  useEffect(() => {
+    getDoc(doc(db, 'settings', 'preferences')).then(snap => {
+      if (snap.exists() && typeof snap.data().dark === 'boolean') setDark(snap.data().dark);
+    }).catch(() => {});
+  }, []);
+
+  const toggleDark = () => {
+    const next = !dark;
+    setDark(next);
+    setDoc(doc(db, 'settings', 'preferences'), { dark: next }, { merge: true }).catch(() => {});
+  };
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'categories'), snap => {
+      setCategories(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    return unsub;
+  }, []);
+
+  useEffect(() => {
+    const q = query(collection(db, 'items'), orderBy('createdAt', 'desc'));
+    const unsub = onSnapshot(q, snap => {
+      setItems(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    return unsub;
+  }, []);
+
+  const itemCounts = useMemo(() => {
+    const counts = {};
+    for (const it of items) {
+      counts[it.categoryId] = (counts[it.categoryId] || 0) + 1;
+    }
+    return counts;
+  }, [items]);
+
+  const rootCats = categories.filter(c => c.parentId === null || c.parentId === undefined);
+
+  const visibleItems = useMemo(() => {
+    let list = items;
+    if (selectedCat) {
+      const ids = new Set(collectDescendantIds(categories, selectedCat));
+      list = list.filter(it => ids.has(it.categoryId));
+    }
+    if (statusFilter !== 'all') list = list.filter(it => it.status === statusFilter);
+    if (search.trim()) {
+      const s = search.trim().toLowerCase();
+      list = list.filter(it =>
+        (it.name || '').toLowerCase().includes(s) ||
+        (it.brand || '').toLowerCase().includes(s) ||
+        (it.store || '').toLowerCase().includes(s)
+      );
+    }
+    return list;
+  }, [items, selectedCat, statusFilter, search, categories]);
+
+  const saveCategory = useCallback(async (data) => {
+    await addDoc(collection(db, 'categories'), data);
+    setShowCatForm(false);
+  }, []);
+
+  const saveItem = useCallback(async (data) => {
+    const { id, ...rest } = data;
+    if (id) {
+      await updateDoc(doc(db, 'items', id), rest);
+    } else {
+      await addDoc(collection(db, 'items'), { ...rest, createdAt: serverTimestamp() });
+    }
+    setShowItemForm(false);
+    setEditingItem(null);
+  }, []);
+
+  const deleteItem = useCallback(async (id) => {
+    await deleteDoc(doc(db, 'items', id));
+    setShowItemForm(false);
+    setEditingItem(null);
+  }, []);
+
+  const catNameOf = (id) => categories.find(c => c.id === id)?.name || '未分類';
+
+  return (
+    <React.Fragment>
+      <div className="topbar">
+        <button className="icon-btn" onClick={() => setDrawerOpen(true)}>☰</button>
+        <h1 className="display">筆藏</h1>
+        <button className="icon-btn" onClick={toggleDark}>{dark ? '☀' : '☾'}</button>
+      </div>
+
+      <div className="search-row">
+        <input className="search-input" placeholder="搜尋名稱、品牌、店家"
+          value={search} onChange={e => setSearch(e.target.value)} />
+        <div className={"chip" + (statusFilter === 'all' ? ' active' : '')} onClick={() => setStatusFilter('all')}>全部</div>
+        <div className={"chip" + (statusFilter === 'owned' ? ' active' : '')} onClick={() => setStatusFilter('owned')}>已收藏</div>
+        <div className={"chip" + (statusFilter === 'wishlist' ? ' active' : '')} onClick={() => setStatusFilter('wishlist')}>願望清單</div>
+      </div>
+
+      <div className="layout">
+        <div className="main">
+          {selectedCat && (
+            <div style={{ marginBottom: 12, fontSize: 13, color: 'var(--ink-soft)' }}>
+              篩選中：{catNameOf(selectedCat)}
+              <span style={{ marginLeft: 8, cursor: 'pointer', textDecoration: 'underline' }}
+                onClick={() => setSelectedCat(null)}>清除</span>
+            </div>
+          )}
+
+          {visibleItems.length === 0 ? (
+            <div className="empty-state">
+              <div className="display">還沒有東西在這裡</div>
+              <div>點右下角的 + 開始紀錄你的收藏吧</div>
+            </div>
+          ) : (
+            <div className="grid">
+              {visibleItems.map(it => (
+                <div key={it.id}
+                  className={"item-card" + (it.status === 'wishlist' ? ' wishlist' : '')}
+                  onClick={() => { setEditingItem(it); setShowItemForm(true); }}>
+                  <div className="ink-stripe" style={{ background: it.colorHex || '#B9A98A' }}></div>
+                  <div className="item-name">{it.name}</div>
+                  <div className="item-meta">{it.brand}{it.brand && it.penType ? ' · ' : ''}{it.penType}</div>
+                  {it.price && <div className="item-meta mono">NT$ {it.price}</div>}
+                  {it.status === 'wishlist' && <div className="wishlist-tag">未入手</div>}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {drawerOpen && (
+        <div className="drawer-overlay" onClick={() => setDrawerOpen(false)}>
+          <div className="drawer" onClick={e => e.stopPropagation()}>
+            <div className="drawer-header">
+              <h2 className="display">分類</h2>
+              <button className="icon-btn" onClick={() => setDrawerOpen(false)}>✕</button>
+            </div>
+            <div className={"cat-row" + (selectedCat === null ? " selected" : "")}
+              onClick={() => { setSelectedCat(null); setDrawerOpen(false); }}>
+              <span className="cat-swatch" style={{ background: '#8A8578' }}></span>
+              <span className="cat-name">全部項目</span>
+              <span className="cat-count">{items.length}</span>
+            </div>
+            {rootCats.map(cat => (
+              <CategoryNode key={cat.id} cat={cat} categories={categories}
+                itemCounts={itemCounts} selectedId={selectedCat}
+                onSelect={(id) => { setSelectedCat(id); setDrawerOpen(false); }}
+                onAddChild={(pid) => { setCatFormParent(pid); setShowCatForm(true); }} />
+            ))}
+            <div className="cat-add-row" style={{ marginTop: 10 }}
+              onClick={() => { setCatFormParent(null); setShowCatForm(true); }}>
+              + 新增頂層分類
+            </div>
+          </div>
+        </div>
+      )}
+
+      <button className="fab" onClick={() => { setEditingItem(null); setShowItemForm(true); }}>+</button>
+
+      {showItemForm && (
+        <ItemForm item={editingItem} categories={categories}
+          onSave={saveItem} onDelete={deleteItem}
+          onClose={() => { setShowItemForm(false); setEditingItem(null); }} />
+      )}
+
+      {showCatForm && (
+        <CategoryForm initialParentId={catFormParent} categories={categories}
+          onSave={saveCategory} onClose={() => setShowCatForm(false)} />
+      )}
+    </React.Fragment>
+  );
+}
+
+const root = createRoot(document.getElementById('root'));
+root.render(<App />);
+</script>
+</body>
+</html>
