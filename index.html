@@ -129,6 +129,12 @@
   }
   .cat-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .cat-count { font-size: 11px; opacity: 0.6; }
+  .cat-more-btn {
+    flex-shrink: 0; width: 24px; height: 24px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px; opacity: 0.5;
+  }
+  .cat-more-btn:active { opacity: 1; background: rgba(0,0,0,0.06); }
   .cat-children { margin-left: 16px; border-left: 1px dashed var(--line); padding-left: 6px; }
   .cat-add-row {
     display: flex; align-items: center; gap: 6px;
@@ -257,7 +263,9 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
 function flattenTree(categories, parentId = null, depth = 0) {
-  const children = categories.filter(c => c.parentId === parentId);
+  const children = categories
+    .filter(c => (c.parentId || null) === parentId)
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   let out = [];
   for (const c of children) {
     out.push({ ...c, depth });
@@ -273,8 +281,10 @@ function collectDescendantIds(categories, rootId) {
   return ids;
 }
 
-function CategoryNode({ cat, categories, itemCounts, selectedId, onSelect, onAddChild, depth = 0 }) {
-  const children = categories.filter(c => c.parentId === cat.id);
+function CategoryNode({ cat, categories, itemCounts, selectedId, onSelect, onAddChild, onOpenActions, depth = 0 }) {
+  const children = categories
+    .filter(c => c.parentId === cat.id)
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   const count = itemCounts[cat.id] || 0;
   return (
     <div className="cat-node">
@@ -285,13 +295,14 @@ function CategoryNode({ cat, categories, itemCounts, selectedId, onSelect, onAdd
         <span className="cat-swatch" style={{ background: cat.color || '#B9A98A' }}></span>
         <span className="cat-name">{cat.name}</span>
         {count > 0 && <span className="cat-count">{count}</span>}
+        <span className="cat-more-btn" onClick={(e) => { e.stopPropagation(); onOpenActions(cat); }}>⋯</span>
       </div>
       {children.length > 0 && (
         <div className="cat-children">
           {children.map(child => (
             <CategoryNode key={child.id} cat={child} categories={categories}
               itemCounts={itemCounts} selectedId={selectedId} onSelect={onSelect}
-              onAddChild={onAddChild} depth={depth + 1} />
+              onAddChild={onAddChild} onOpenActions={onOpenActions} depth={depth + 1} />
           ))}
         </div>
       )}
@@ -304,16 +315,17 @@ function CategoryNode({ cat, categories, itemCounts, selectedId, onSelect, onAdd
   );
 }
 
-function CategoryForm({ initialParentId, categories, onSave, onClose }) {
-  const [name, setName] = useState('');
-  const [parentId, setParentId] = useState(initialParentId || null);
-  const [color, setColor] = useState('#B9A98A');
-  const flat = flattenTree(categories);
+function CategoryForm({ category, initialParentId, categories, onSave, onDelete, onClose }) {
+  const [name, setName] = useState(category?.name || '');
+  const [parentId, setParentId] = useState(category ? (category.parentId || null) : (initialParentId || null));
+  const [color, setColor] = useState(category?.color || '#B9A98A');
+  const excludeIds = category ? new Set(collectDescendantIds(categories, category.id)) : new Set();
+  const flat = flattenTree(categories).filter(c => !excludeIds.has(c.id));
 
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={e => e.stopPropagation()}>
-        <h2 className="display">新增分類</h2>
+        <h2 className="display">{category ? '編輯分類' : '新增分類'}</h2>
         <div className="field">
           <label>分類名稱</label>
           <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="例如：色鉛筆" />
@@ -334,9 +346,10 @@ function CategoryForm({ initialParentId, categories, onSave, onClose }) {
           </div>
         </div>
         <div className="modal-actions">
+          {category && <button className="btn btn-danger" onClick={() => onDelete(category)}>刪除</button>}
           <button className="btn btn-ghost" onClick={onClose}>取消</button>
           <button className="btn btn-primary" disabled={!name.trim()}
-            onClick={() => { onSave({ name: name.trim(), parentId, color }); }}>
+            onClick={() => { onSave({ id: category?.id, name: name.trim(), parentId, color }); }}>
             儲存
           </button>
         </div>
@@ -441,6 +454,8 @@ function App() {
   const [showItemForm, setShowItemForm] = useState(false);
   const [showCatForm, setShowCatForm] = useState(false);
   const [catFormParent, setCatFormParent] = useState(null);
+  const [editingCat, setEditingCat] = useState(null);
+  const [actionCat, setActionCat] = useState(null);
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark);
@@ -481,7 +496,9 @@ function App() {
     return counts;
   }, [items]);
 
-  const rootCats = categories.filter(c => c.parentId === null || c.parentId === undefined);
+  const rootCats = categories
+    .filter(c => c.parentId === null || c.parentId === undefined)
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 
   const visibleItems = useMemo(() => {
     let list = items;
@@ -503,12 +520,56 @@ function App() {
 
   const saveCategory = useCallback(async (data) => {
     try {
-      await addDoc(collection(db, 'categories'), { ...data, parentId: data.parentId || null });
+      const { id, ...rest } = data;
+      const payload = { ...rest, parentId: rest.parentId || null };
+      if (id) {
+        await updateDoc(doc(db, 'categories', id), payload);
+      } else {
+        await addDoc(collection(db, 'categories'), { ...payload, order: Date.now() });
+      }
       setShowCatForm(false);
+      setEditingCat(null);
     } catch (err) {
       alert('分類儲存失敗：' + err.message);
     }
   }, []);
+
+  const deleteCategory = useCallback(async (cat) => {
+    const hasChildren = categories.some(c => c.parentId === cat.id);
+    if (hasChildren) {
+      alert('這個分類底下還有子分類，請先刪除或搬移子分類');
+      return;
+    }
+    if (!confirm(`確定要刪除「${cat.name}」嗎？底下的項目會變成未分類。`)) return;
+    try {
+      const affected = items.filter(it => it.categoryId === cat.id);
+      await Promise.all(affected.map(it => updateDoc(doc(db, 'items', it.id), { categoryId: null })));
+      await deleteDoc(doc(db, 'categories', cat.id));
+      if (selectedCat === cat.id) setSelectedCat(null);
+      setShowCatForm(false);
+      setEditingCat(null);
+    } catch (err) {
+      alert('刪除失敗：' + err.message);
+    }
+  }, [categories, items, selectedCat]);
+
+  const moveCategory = useCallback(async (cat, direction) => {
+    const siblings = categories
+      .filter(c => (c.parentId || null) === (cat.parentId || null))
+      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    const idx = siblings.findIndex(c => c.id === cat.id);
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= siblings.length) return;
+    const orders = siblings.map((c, i) => ({ id: c.id, order: i * 10 }));
+    const tmp = orders[idx].order;
+    orders[idx].order = orders[swapIdx].order;
+    orders[swapIdx].order = tmp;
+    try {
+      await Promise.all(orders.map(o => updateDoc(doc(db, 'categories', o.id), { order: o.order })));
+    } catch (err) {
+      alert('排序失敗：' + err.message);
+    }
+  }, [categories]);
 
   const saveItem = useCallback(async (data) => {
     const { id, ...rest } = data;
@@ -604,10 +665,11 @@ function App() {
               <CategoryNode key={cat.id} cat={cat} categories={categories}
                 itemCounts={itemCounts} selectedId={selectedCat}
                 onSelect={(id) => { setSelectedCat(id); setDrawerOpen(false); }}
-                onAddChild={(pid) => { setCatFormParent(pid); setShowCatForm(true); }} />
+                onAddChild={(pid) => { setEditingCat(null); setCatFormParent(pid); setShowCatForm(true); }}
+                onOpenActions={(cat) => setActionCat(cat)} />
             ))}
             <div className="cat-add-row" style={{ marginTop: 10 }}
-              onClick={() => { setCatFormParent(null); setShowCatForm(true); }}>
+              onClick={() => { setEditingCat(null); setCatFormParent(null); setShowCatForm(true); }}>
               + 新增頂層分類
             </div>
           </div>
@@ -623,8 +685,26 @@ function App() {
       )}
 
       {showCatForm && (
-        <CategoryForm initialParentId={catFormParent} categories={categories}
-          onSave={saveCategory} onClose={() => setShowCatForm(false)} />
+        <CategoryForm category={editingCat} initialParentId={catFormParent} categories={categories}
+          onSave={saveCategory} onDelete={(cat) => deleteCategory(cat)}
+          onClose={() => { setShowCatForm(false); setEditingCat(null); }} />
+      )}
+
+      {actionCat && (
+        <div className="modal-overlay" onClick={() => setActionCat(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 360 }}>
+            <h2 className="display">{actionCat.name}</h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <button className="btn btn-ghost" onClick={() => { moveCategory(actionCat, 'up'); setActionCat(null); }}>↑ 上移</button>
+              <button className="btn btn-ghost" onClick={() => { moveCategory(actionCat, 'down'); setActionCat(null); }}>↓ 下移</button>
+              <button className="btn btn-ghost" onClick={() => { setEditingCat(actionCat); setCatFormParent(actionCat.parentId); setShowCatForm(true); setActionCat(null); }}>✎ 編輯</button>
+              <button className="btn btn-danger" onClick={() => { deleteCategory(actionCat); setActionCat(null); }}>刪除</button>
+            </div>
+            <div className="modal-actions">
+              <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setActionCat(null)}>取消</button>
+            </div>
+          </div>
+        </div>
       )}
     </React.Fragment>
   );
