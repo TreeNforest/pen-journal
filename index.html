@@ -256,8 +256,6 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-const PEN_TYPES = ["原子筆", "鋼珠筆", "鋼筆", "色鉛筆", "麥克筆", "代針筆", "其他"];
-
 function flattenTree(categories, parentId = null, depth = 0) {
   const children = categories.filter(c => c.parentId === parentId);
   let out = [];
@@ -349,9 +347,9 @@ function CategoryForm({ initialParentId, categories, onSave, onClose }) {
 
 function ItemForm({ item, categories, onSave, onDelete, onClose }) {
   const flat = flattenTree(categories);
-  const [form, setForm] = useState(item || {
-    name: '', categoryId: flat[0]?.id || '', brand: '', colorHex: '#C1432E',
-    penType: PEN_TYPES[0], purchaseDate: '', price: '', store: '', notes: '',
+  const [form, setForm] = useState(item ? { ...item, categoryId: item.categoryId || '' } : {
+    name: '', categoryId: '', brand: '', colorHex: '#C1432E',
+    purchaseDate: '', price: '', store: '', notes: '',
     status: 'owned'
   });
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -384,17 +382,16 @@ function ItemForm({ item, categories, onSave, onDelete, onClose }) {
         <div className="field">
           <label>分類</label>
           <select value={form.categoryId} onChange={e => set('categoryId', e.target.value)}>
+            <option value="">（未分類）</option>
             {flat.map(c => (
               <option key={c.id} value={c.id}>{'　'.repeat(c.depth)}{c.name}</option>
             ))}
           </select>
-        </div>
-
-        <div className="field">
-          <label>類型</label>
-          <select value={form.penType} onChange={e => set('penType', e.target.value)}>
-            {PEN_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-          </select>
+          {flat.length === 0 && (
+            <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 4 }}>
+              還沒有分類，可以先存這筆，之後再從左上角選單新增分類並回來指定
+            </div>
+          )}
         </div>
 
         <div className="field">
@@ -505,25 +502,38 @@ function App() {
   }, [items, selectedCat, statusFilter, search, categories]);
 
   const saveCategory = useCallback(async (data) => {
-    await addDoc(collection(db, 'categories'), data);
-    setShowCatForm(false);
+    try {
+      await addDoc(collection(db, 'categories'), { ...data, parentId: data.parentId || null });
+      setShowCatForm(false);
+    } catch (err) {
+      alert('分類儲存失敗：' + err.message);
+    }
   }, []);
 
   const saveItem = useCallback(async (data) => {
     const { id, ...rest } = data;
-    if (id) {
-      await updateDoc(doc(db, 'items', id), rest);
-    } else {
-      await addDoc(collection(db, 'items'), { ...rest, createdAt: serverTimestamp() });
+    const payload = { ...rest, categoryId: rest.categoryId || null };
+    try {
+      if (id) {
+        await updateDoc(doc(db, 'items', id), payload);
+      } else {
+        await addDoc(collection(db, 'items'), { ...payload, createdAt: serverTimestamp() });
+      }
+      setShowItemForm(false);
+      setEditingItem(null);
+    } catch (err) {
+      alert('項目儲存失敗：' + err.message);
     }
-    setShowItemForm(false);
-    setEditingItem(null);
   }, []);
 
   const deleteItem = useCallback(async (id) => {
-    await deleteDoc(doc(db, 'items', id));
-    setShowItemForm(false);
-    setEditingItem(null);
+    try {
+      await deleteDoc(doc(db, 'items', id));
+      setShowItemForm(false);
+      setEditingItem(null);
+    } catch (err) {
+      alert('刪除失敗：' + err.message);
+    }
   }, []);
 
   const catNameOf = (id) => categories.find(c => c.id === id)?.name || '未分類';
@@ -567,7 +577,7 @@ function App() {
                   onClick={() => { setEditingItem(it); setShowItemForm(true); }}>
                   <div className="ink-stripe" style={{ background: it.colorHex || '#B9A98A' }}></div>
                   <div className="item-name">{it.name}</div>
-                  <div className="item-meta">{it.brand}{it.brand && it.penType ? ' · ' : ''}{it.penType}</div>
+                  {it.brand && <div className="item-meta">{it.brand}</div>}
                   {it.price && <div className="item-meta mono">NT$ {it.price}</div>}
                   {it.status === 'wishlist' && <div className="wishlist-tag">未入手</div>}
                 </div>
