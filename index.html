@@ -281,7 +281,7 @@ function collectDescendantIds(categories, rootId) {
   return ids;
 }
 
-function CategoryNode({ cat, categories, itemCounts, selectedId, onSelect, onAddChild, onOpenActions, depth = 0 }) {
+function CategoryNode({ cat, categories, itemCounts, selectedId, onSelect, onOpenActions, depth = 0 }) {
   const children = categories
     .filter(c => c.parentId === cat.id)
     .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
@@ -302,15 +302,10 @@ function CategoryNode({ cat, categories, itemCounts, selectedId, onSelect, onAdd
           {children.map(child => (
             <CategoryNode key={child.id} cat={child} categories={categories}
               itemCounts={itemCounts} selectedId={selectedId} onSelect={onSelect}
-              onAddChild={onAddChild} onOpenActions={onOpenActions} depth={depth + 1} />
+              onOpenActions={onOpenActions} depth={depth + 1} />
           ))}
         </div>
       )}
-      <div className="cat-children">
-        <div className="cat-add-row" onClick={() => onAddChild(cat.id)}>
-          + 新增子分類
-        </div>
-      </div>
     </div>
   );
 }
@@ -665,7 +660,6 @@ function App() {
               <CategoryNode key={cat.id} cat={cat} categories={categories}
                 itemCounts={itemCounts} selectedId={selectedCat}
                 onSelect={(id) => { setSelectedCat(id); setDrawerOpen(false); }}
-                onAddChild={(pid) => { setEditingCat(null); setCatFormParent(pid); setShowCatForm(true); }}
                 onOpenActions={(cat) => setActionCat(cat)} />
             ))}
             <div className="cat-add-row" style={{ marginTop: 10 }}
@@ -695,6 +689,7 @@ function App() {
           <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 360 }}>
             <h2 className="display">{actionCat.name}</h2>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <button className="btn btn-ghost" onClick={() => { setEditingCat(null); setCatFormParent(actionCat.id); setShowCatForm(true); setActionCat(null); }}>+ 新增子分類</button>
               <button className="btn btn-ghost" onClick={() => { moveCategory(actionCat, 'up'); setActionCat(null); }}>↑ 上移</button>
               <button className="btn btn-ghost" onClick={() => { moveCategory(actionCat, 'down'); setActionCat(null); }}>↓ 下移</button>
               <button className="btn btn-ghost" onClick={() => { setEditingCat(actionCat); setCatFormParent(actionCat.parentId); setShowCatForm(true); setActionCat(null); }}>✎ 編輯</button>
