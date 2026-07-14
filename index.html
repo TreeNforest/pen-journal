@@ -355,8 +355,8 @@ function CategoryForm({ category, initialParentId, categories, onSave, onDelete,
 
 function ItemForm({ item, categories, onSave, onDelete, onClose }) {
   const flat = flattenTree(categories);
-  const [form, setForm] = useState(item ? { ...item, categoryId: item.categoryId || '' } : {
-    name: '', categoryId: '', brand: '', colorHex: '#C1432E',
+  const [form, setForm] = useState(item ? { ...item, categoryId: item.categoryId || '', writeColorHex: item.writeColorHex || item.colorHex || '#C1432E' } : {
+    name: '', categoryId: '', brand: '', colorHex: '#C1432E', writeColorHex: '#C1432E',
     purchaseDate: '', price: '', store: '', notes: '',
     status: 'owned', isSet: false
   });
@@ -394,11 +394,21 @@ function ItemForm({ item, categories, onSave, onDelete, onClose }) {
         </div>
 
         <div className="field">
-          <label>{form.isSet ? '代表色（卡片上會顯示這個顏色）' : '顏色（墨色條會用這個顏色）'}</label>
+          <label>{form.isSet ? '代表色（卡片上會顯示這個顏色）' : '外殼／筆身顏色（卡片墨色條會用這個顏色）'}</label>
           <div className="color-row">
             <input type="color" value={form.colorHex} onChange={e => set('colorHex', e.target.value)} />
           </div>
         </div>
+
+        {!form.isSet && (
+          <div className="field">
+            <label>使用色（實際畫/寫出來的顏色，顏色總覽會依這個排序）</label>
+            <div className="color-row">
+              <input type="color" value={form.writeColorHex} onChange={e => set('writeColorHex', e.target.value)} />
+              <span style={{ fontSize: 12, color: 'var(--ink-soft)' }}>跟外殼不同色才需要改</span>
+            </div>
+          </div>
+        )}
 
         <div className="field">
           <label>分類</label>
@@ -572,7 +582,8 @@ function ColorPaletteView({ items, onSelectItem }) {
         if (c.colorHex) swatches.push({ id: it.id + ':' + c.id, name: c.name, colorHex: c.colorHex, parent: it, isSetColor: true });
       }
     } else if (it.colorHex) {
-      swatches.push({ id: it.id, name: it.name, colorHex: it.colorHex, parent: it, isSetColor: false });
+      const useHex = it.writeColorHex || it.colorHex;
+      swatches.push({ id: it.id, name: it.name, colorHex: useHex, parent: it, isSetColor: false });
     }
   }
   const order = ['red', 'orange', 'yellow', 'yellowgreen', 'green', 'teal', 'blue', 'purple', 'magenta', 'neutral'];
