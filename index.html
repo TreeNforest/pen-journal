@@ -310,6 +310,32 @@ function CategoryNode({ cat, categories, itemCounts, selectedId, onSelect, onOpe
   );
 }
 
+function HexColorInput({ value, onChange, size }) {
+  const [text, setText] = useState(value || '#000000');
+  useEffect(() => { setText(value || '#000000'); }, [value]);
+  const isValid = (t) => /^#[0-9A-Fa-f]{6}$/.test(t);
+  const commit = (raw) => {
+    let t = raw.trim();
+    if (t && !t.startsWith('#')) t = '#' + t;
+    if (isValid(t)) onChange(t.toUpperCase());
+    else setText(value || '#000000');
+  };
+  const s = size || 40;
+  return (
+    <React.Fragment>
+      <input type="color" value={isValid(text) ? text : (value || '#000000')}
+        onChange={e => { setText(e.target.value); onChange(e.target.value); }}
+        style={{ width: s, height: s, borderRadius: 10, border: '1px solid var(--line)', padding: 2, flexShrink: 0 }} />
+      <input type="text" value={text} maxLength={7}
+        onChange={e => setText(e.target.value)}
+        onBlur={e => commit(e.target.value)}
+        placeholder="#RRGGBB"
+        className="mono"
+        style={{ width: 92, flexShrink: 0, padding: '9px 8px', borderRadius: 10, border: '1px solid var(--line)', background: 'var(--paper-raised)', color: 'var(--ink)', fontSize: 13 }} />
+    </React.Fragment>
+  );
+}
+
 function CategoryForm({ category, initialParentId, categories, onSave, onDelete, onClose }) {
   const [name, setName] = useState(category?.name || '');
   const [parentId, setParentId] = useState(category ? (category.parentId || null) : (initialParentId || null));
@@ -337,7 +363,7 @@ function CategoryForm({ category, initialParentId, categories, onSave, onDelete,
         <div className="field">
           <label>標籤色</label>
           <div className="color-row">
-            <input type="color" value={color} onChange={e => setColor(e.target.value)} />
+            <HexColorInput value={color} onChange={setColor} />
           </div>
         </div>
         <div className="modal-actions">
@@ -396,7 +422,7 @@ function ItemForm({ item, categories, onSave, onDelete, onClose }) {
         <div className="field">
           <label>{form.isSet ? '代表色（卡片上會顯示這個顏色）' : '外殼／筆身顏色（卡片墨色條會用這個顏色）'}</label>
           <div className="color-row">
-            <input type="color" value={form.colorHex} onChange={e => set('colorHex', e.target.value)} />
+            <HexColorInput value={form.colorHex} onChange={v => set('colorHex', v)} size={44} />
           </div>
         </div>
 
@@ -404,8 +430,7 @@ function ItemForm({ item, categories, onSave, onDelete, onClose }) {
           <div className="field">
             <label>使用色（實際畫/寫出來的顏色，顏色總覽會依這個排序）</label>
             <div className="color-row">
-              <input type="color" value={form.writeColorHex} onChange={e => set('writeColorHex', e.target.value)} />
-              <span style={{ fontSize: 12, color: 'var(--ink-soft)' }}>跟外殼不同色才需要改</span>
+              <HexColorInput value={form.writeColorHex} onChange={v => set('writeColorHex', v)} size={44} />
             </div>
           </div>
         )}
@@ -492,11 +517,10 @@ function SetColorsView({ item, onUpdateColors, onEditBox, onClose }) {
 
         <div className="field">
           <label>新增顏色</label>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <input type="color" value={hex} onChange={e => setHex(e.target.value)}
-              style={{ width: 40, height: 40, borderRadius: 10, border: '1px solid var(--line)', padding: 2, flexShrink: 0 }} />
-            <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="顏色名稱" style={{ flex: 2, padding: '10px 12px', borderRadius: 10, border: '1px solid var(--line)', background: 'var(--paper-raised)', color: 'var(--ink)', fontFamily: 'inherit', fontSize: 14 }} />
-            <input type="text" value={code} onChange={e => setCode(e.target.value)} placeholder="編號" style={{ flex: 1, padding: '10px 12px', borderRadius: 10, border: '1px solid var(--line)', background: 'var(--paper-raised)', color: 'var(--ink)', fontFamily: 'inherit', fontSize: 14 }} />
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <HexColorInput value={hex} onChange={setHex} size={40} />
+            <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="顏色名稱" style={{ flex: 2, minWidth: 100, padding: '10px 12px', borderRadius: 10, border: '1px solid var(--line)', background: 'var(--paper-raised)', color: 'var(--ink)', fontFamily: 'inherit', fontSize: 14 }} />
+            <input type="text" value={code} onChange={e => setCode(e.target.value)} placeholder="編號" style={{ flex: 1, minWidth: 70, padding: '10px 12px', borderRadius: 10, border: '1px solid var(--line)', background: 'var(--paper-raised)', color: 'var(--ink)', fontFamily: 'inherit', fontSize: 14 }} />
           </div>
           <button className="btn btn-primary" style={{ marginTop: 8, width: '100%' }} disabled={!name.trim()} onClick={addColor}>+ 加入這支顏色</button>
         </div>
@@ -508,13 +532,12 @@ function SetColorsView({ item, onUpdateColors, onEditBox, onClose }) {
             </div>
           )}
           {colors.map(c => (
-            <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 4px', borderBottom: '1px solid var(--line)' }}>
-              <input type="color" value={c.colorHex} onChange={e => updateColor(c.id, { colorHex: e.target.value })}
-                style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid var(--line)', padding: 1, flexShrink: 0 }} />
+            <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 4px', borderBottom: '1px solid var(--line)', flexWrap: 'wrap' }}>
+              <HexColorInput value={c.colorHex} onChange={v => updateColor(c.id, { colorHex: v })} size={30} />
               <input type="text" value={c.name} onChange={e => updateColor(c.id, { name: e.target.value })}
-                style={{ flex: 2, border: 'none', background: 'transparent', color: 'var(--ink)', fontFamily: 'inherit', fontSize: 14 }} />
+                style={{ flex: 2, minWidth: 80, border: 'none', background: 'transparent', color: 'var(--ink)', fontFamily: 'inherit', fontSize: 14 }} />
               <input type="text" value={c.code || ''} onChange={e => updateColor(c.id, { code: e.target.value })}
-                placeholder="編號" style={{ flex: 1, border: 'none', background: 'transparent', color: 'var(--ink-soft)', fontFamily: 'inherit', fontSize: 12.5 }} />
+                placeholder="編號" style={{ flex: 1, minWidth: 50, border: 'none', background: 'transparent', color: 'var(--ink-soft)', fontFamily: 'inherit', fontSize: 12.5 }} />
               <span onClick={() => removeColor(c.id)} style={{ flexShrink: 0, color: 'var(--vermilion)', fontSize: 13, cursor: 'pointer', padding: '4px 6px' }}>刪除</span>
             </div>
           ))}
