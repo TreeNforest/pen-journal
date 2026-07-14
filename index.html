@@ -358,7 +358,7 @@ function ItemForm({ item, categories, onSave, onDelete, onClose }) {
   const [form, setForm] = useState(item ? { ...item, categoryId: item.categoryId || '' } : {
     name: '', categoryId: '', brand: '', colorHex: '#C1432E',
     purchaseDate: '', price: '', store: '', notes: '',
-    status: 'owned'
+    status: 'owned', isSet: false
   });
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
@@ -376,12 +376,25 @@ function ItemForm({ item, categories, onSave, onDelete, onClose }) {
         </div>
 
         <div className="field">
+          <label>類型</label>
+          <div className="status-toggle">
+            <button className={!form.isSet ? 'active' : ''} onClick={() => set('isSet', false)}>單一項目</button>
+            <button className={form.isSet ? 'active' : ''} onClick={() => set('isSet', true)}>整組／色盒</button>
+          </div>
+          {form.isSet && (
+            <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 6 }}>
+              例如 72 色鉛筆盒。存檔後點卡片會進到盒子內部，管理裡面每一支顏色。
+            </div>
+          )}
+        </div>
+
+        <div className="field">
           <label>名稱</label>
           <input type="text" value={form.name} onChange={e => set('name', e.target.value)} placeholder="例如：Uni Jetstream 0.5 黑" />
         </div>
 
         <div className="field">
-          <label>顏色（墨色條會用這個顏色）</label>
+          <label>{form.isSet ? '代表色（卡片上會顯示這個顏色）' : '顏色（墨色條會用這個顏色）'}</label>
           <div className="color-row">
             <input type="color" value={form.colorHex} onChange={e => set('colorHex', e.target.value)} />
           </div>
@@ -437,6 +450,74 @@ function ItemForm({ item, categories, onSave, onDelete, onClose }) {
   );
 }
 
+function SetColorsView({ item, onUpdateColors, onEditBox, onClose }) {
+  const colors = item.colors || [];
+  const [name, setName] = useState('');
+  const [code, setCode] = useState('');
+  const [hex, setHex] = useState('#C1432E');
+
+  const addColor = () => {
+    if (!name.trim()) return;
+    const next = [...colors, { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name: name.trim(), code: code.trim(), colorHex: hex }];
+    onUpdateColors(next);
+    setName(''); setCode('');
+  };
+
+  const removeColor = (id) => {
+    onUpdateColors(colors.filter(c => c.id !== id));
+  };
+
+  const updateColor = (id, patch) => {
+    onUpdateColors(colors.map(c => c.id === id ? { ...c, ...patch } : c));
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxHeight: '92vh' }}>
+        <h2 className="display">{item.name}</h2>
+        <div style={{ fontSize: 12.5, color: 'var(--ink-soft)', marginBottom: 14 }}>
+          {item.brand}{item.brand ? ' · ' : ''}{colors.length} 色
+          <span style={{ marginLeft: 10, textDecoration: 'underline', cursor: 'pointer' }} onClick={onEditBox}>編輯盒子基本資料</span>
+        </div>
+
+        <div className="field">
+          <label>新增顏色</label>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <input type="color" value={hex} onChange={e => setHex(e.target.value)}
+              style={{ width: 40, height: 40, borderRadius: 10, border: '1px solid var(--line)', padding: 2, flexShrink: 0 }} />
+            <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="顏色名稱" style={{ flex: 2, padding: '10px 12px', borderRadius: 10, border: '1px solid var(--line)', background: 'var(--paper-raised)', color: 'var(--ink)', fontFamily: 'inherit', fontSize: 14 }} />
+            <input type="text" value={code} onChange={e => setCode(e.target.value)} placeholder="編號" style={{ flex: 1, padding: '10px 12px', borderRadius: 10, border: '1px solid var(--line)', background: 'var(--paper-raised)', color: 'var(--ink)', fontFamily: 'inherit', fontSize: 14 }} />
+          </div>
+          <button className="btn btn-primary" style={{ marginTop: 8, width: '100%' }} disabled={!name.trim()} onClick={addColor}>+ 加入這支顏色</button>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 16 }}>
+          {colors.length === 0 && (
+            <div style={{ fontSize: 13, color: 'var(--ink-soft)', textAlign: 'center', padding: '20px 0' }}>
+              還沒有加入任何顏色
+            </div>
+          )}
+          {colors.map(c => (
+            <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 4px', borderBottom: '1px solid var(--line)' }}>
+              <input type="color" value={c.colorHex} onChange={e => updateColor(c.id, { colorHex: e.target.value })}
+                style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid var(--line)', padding: 1, flexShrink: 0 }} />
+              <input type="text" value={c.name} onChange={e => updateColor(c.id, { name: e.target.value })}
+                style={{ flex: 2, border: 'none', background: 'transparent', color: 'var(--ink)', fontFamily: 'inherit', fontSize: 14 }} />
+              <input type="text" value={c.code || ''} onChange={e => updateColor(c.id, { code: e.target.value })}
+                placeholder="編號" style={{ flex: 1, border: 'none', background: 'transparent', color: 'var(--ink-soft)', fontFamily: 'inherit', fontSize: 12.5 }} />
+              <span onClick={() => removeColor(c.id)} style={{ flexShrink: 0, color: 'var(--vermilion)', fontSize: 13, cursor: 'pointer', padding: '4px 6px' }}>刪除</span>
+            </div>
+          ))}
+        </div>
+
+        <div className="modal-actions">
+          <button className="btn btn-primary" style={{ flex: 1 }} onClick={onClose}>完成</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function hexToHSL(hex) {
   let r = 0, g = 0, b = 0;
   if (hex.length === 7) {
@@ -483,20 +564,30 @@ function getColorFamilyKey(hex) {
 }
 
 function ColorPaletteView({ items, onSelectItem }) {
-  const owned = items.filter(it => it.status === 'owned' && it.colorHex);
+  const swatches = [];
+  for (const it of items) {
+    if (it.status !== 'owned') continue;
+    if (it.isSet) {
+      for (const c of (it.colors || [])) {
+        if (c.colorHex) swatches.push({ id: it.id + ':' + c.id, name: c.name, colorHex: c.colorHex, parent: it, isSetColor: true });
+      }
+    } else if (it.colorHex) {
+      swatches.push({ id: it.id, name: it.name, colorHex: it.colorHex, parent: it, isSetColor: false });
+    }
+  }
   const order = ['red', 'orange', 'yellow', 'yellowgreen', 'green', 'teal', 'blue', 'purple', 'magenta', 'neutral'];
   const labels = { red: '紅', orange: '橙', yellow: '黃', yellowgreen: '黃綠', green: '綠', teal: '藍綠', blue: '藍', purple: '紫', magenta: '桃紫', neutral: '中性／黑白灰' };
   const groups = {};
-  for (const it of owned) {
-    const key = getColorFamilyKey(it.colorHex);
-    (groups[key] = groups[key] || []).push(it);
+  for (const sw of swatches) {
+    const key = getColorFamilyKey(sw.colorHex);
+    (groups[key] = groups[key] || []).push(sw);
   }
   for (const key of Object.keys(groups)) {
     groups[key].sort((a, b) => hexToHSL(b.colorHex).l - hexToHSL(a.colorHex).l);
   }
   const nonEmpty = order.filter(k => groups[k] && groups[k].length > 0);
 
-  if (owned.length === 0) {
+  if (swatches.length === 0) {
     return (
       <div className="empty-state">
         <div className="display">還沒有顏色可以看</div>
@@ -513,17 +604,17 @@ function ColorPaletteView({ items, onSelectItem }) {
             {labels[key]} <span className="mono" style={{ fontSize: 11, opacity: 0.7 }}>{groups[key].length}</span>
           </div>
           <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
-            {groups[key].map(it => (
-              <div key={it.id} onClick={() => onSelectItem(it)}
+            {groups[key].map(sw => (
+              <div key={sw.id} onClick={() => onSelectItem(sw.parent)}
                 style={{ flexShrink: 0, width: 52, cursor: 'pointer' }}>
                 <div style={{
-                  width: 52, height: 52, borderRadius: 10, background: it.colorHex,
+                  width: 52, height: 52, borderRadius: 10, background: sw.colorHex,
                   border: '1px solid var(--line)', boxShadow: 'var(--shadow)'
                 }}></div>
                 <div style={{
                   fontSize: 10.5, color: 'var(--ink-soft)', marginTop: 4,
                   overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
-                }}>{it.name}</div>
+                }}>{sw.name}</div>
               </div>
             ))}
           </div>
@@ -544,6 +635,7 @@ function App() {
   const [search, setSearch] = useState('');
   const [editingItem, setEditingItem] = useState(null);
   const [showItemForm, setShowItemForm] = useState(false);
+  const [viewingSet, setViewingSet] = useState(null);
   const [showCatForm, setShowCatForm] = useState(false);
   const [catFormParent, setCatFormParent] = useState(null);
   const [editingCat, setEditingCat] = useState(null);
@@ -689,6 +781,23 @@ function App() {
     }
   }, []);
 
+  const openItem = useCallback((it) => {
+    if (it.isSet) {
+      setViewingSet(it);
+    } else {
+      setEditingItem(it);
+      setShowItemForm(true);
+    }
+  }, []);
+
+  const updateSetColors = useCallback(async (itemId, colors) => {
+    try {
+      await updateDoc(doc(db, 'items', itemId), { colors });
+    } catch (err) {
+      alert('顏色儲存失敗：' + err.message);
+    }
+  }, []);
+
   const catNameOf = (id) => categories.find(c => c.id === id)?.name || '未分類';
 
   return (
@@ -715,7 +824,7 @@ function App() {
       <div className="layout">
         <div className="main">
           {view === 'palette' ? (
-            <ColorPaletteView items={items} onSelectItem={(it) => { setEditingItem(it); setShowItemForm(true); }} />
+            <ColorPaletteView items={items} onSelectItem={openItem} />
           ) : (
           <React.Fragment>
           {selectedCat && (
@@ -736,10 +845,11 @@ function App() {
               {visibleItems.map(it => (
                 <div key={it.id}
                   className={"item-card" + (it.status === 'wishlist' ? ' wishlist' : '')}
-                  onClick={() => { setEditingItem(it); setShowItemForm(true); }}>
+                  onClick={() => openItem(it)}>
                   <div className="ink-stripe" style={{ background: it.colorHex || '#B9A98A' }}></div>
                   <div className="item-name">{it.name}</div>
                   {it.brand && <div className="item-meta">{it.brand}</div>}
+                  {it.isSet && <div className="item-meta">{(it.colors || []).length} 色</div>}
                   {it.price && <div className="item-meta mono">NT$ {it.price}</div>}
                   {it.status === 'wishlist' && <div className="wishlist-tag">未入手</div>}
                 </div>
@@ -808,6 +918,15 @@ function App() {
             </div>
           </div>
         </div>
+      )}
+
+      {viewingSet && (
+        <SetColorsView
+          item={items.find(it => it.id === viewingSet.id) || viewingSet}
+          onUpdateColors={(colors) => updateSetColors(viewingSet.id, colors)}
+          onEditBox={() => { setEditingItem(viewingSet); setShowItemForm(true); setViewingSet(null); }}
+          onClose={() => setViewingSet(null)}
+        />
       )}
     </React.Fragment>
   );
