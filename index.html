@@ -507,6 +507,15 @@ function SetColorsView({ item, onUpdateColors, onEditBox, onClose }) {
     onUpdateColors(colors.map(c => c.id === id ? { ...c, ...patch } : c));
   };
 
+  const sortedColors = useMemo(() => {
+    return [...colors].sort((a, b) => {
+      const fa = FAMILY_ORDER.indexOf(getColorFamilyKey(a.colorHex));
+      const fb = FAMILY_ORDER.indexOf(getColorFamilyKey(b.colorHex));
+      if (fa !== fb) return fa - fb;
+      return hexToHSL(b.colorHex).l - hexToHSL(a.colorHex).l;
+    });
+  }, [colors]);
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={e => e.stopPropagation()} style={{ maxHeight: '92vh' }}>
@@ -539,7 +548,7 @@ function SetColorsView({ item, onUpdateColors, onEditBox, onClose }) {
               還沒有加入任何顏色
             </div>
           )}
-          {colors.map(c => (
+          {sortedColors.map(c => (
             <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 4px', borderBottom: '1px solid var(--line)', flexWrap: 'wrap' }}>
               <HexColorInput value={c.colorHex} onChange={v => updateColor(c.id, { colorHex: v })} size={30} />
               <input type="text" value={c.name} onChange={e => updateColor(c.id, { name: e.target.value })}
