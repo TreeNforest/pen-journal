@@ -381,10 +381,10 @@ function CategoryForm({ category, initialParentId, categories, onSave, onDelete,
 
 function ItemForm({ item, categories, onSave, onDelete, onClose }) {
   const flat = flattenTree(categories);
-  const [form, setForm] = useState(item ? { ...item, categoryId: item.categoryId || '', writeColorHex: item.writeColorHex || item.colorHex || '#C1432E' } : {
+  const [form, setForm] = useState(item ? { ...item, categoryId: item.categoryId || '', writeColorHex: item.writeColorHex || item.colorHex || '#C1432E', trackColor: item.trackColor !== false } : {
     name: '', categoryId: '', brand: '', colorHex: '#C1432E', writeColorHex: '#C1432E',
     purchaseDate: '', price: '', store: '', notes: '',
-    status: 'owned', isSet: false
+    status: 'owned', isSet: false, trackColor: true
   });
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
@@ -428,10 +428,20 @@ function ItemForm({ item, categories, onSave, onDelete, onClose }) {
 
         {!form.isSet && (
           <div className="field">
-            <label>使用色（實際畫/寫出來的顏色，顏色總覽會依這個排序）</label>
-            <div className="color-row">
-              <HexColorInput value={form.writeColorHex} onChange={v => set('writeColorHex', v)} size={44} />
+            <label>使用色</label>
+            <div className="status-toggle" style={{ marginBottom: form.trackColor ? 10 : 0 }}>
+              <button className={form.trackColor ? 'active' : ''} onClick={() => set('trackColor', true)}>有固定使用色</button>
+              <button className={!form.trackColor ? 'active' : ''} onClick={() => set('trackColor', false)}>會換色，不追蹤</button>
             </div>
+            {form.trackColor ? (
+              <div className="color-row">
+                <HexColorInput value={form.writeColorHex} onChange={v => set('writeColorHex', v)} size={44} />
+              </div>
+            ) : (
+              <div style={{ fontSize: 12, color: 'var(--ink-soft)' }}>
+                例如鋼筆可以換墨水。這個項目不會出現在顏色總覽裡。
+              </div>
+            )}
           </div>
         )}
 
@@ -662,7 +672,7 @@ function ColorPaletteView({ items, onSelectItem }) {
       for (const c of (it.colors || [])) {
         if (c.colorHex) swatches.push({ id: it.id + ':' + c.id, name: c.name, colorHex: c.colorHex, parent: it, isSetColor: true });
       }
-    } else if (it.colorHex) {
+    } else if (it.colorHex && it.trackColor !== false) {
       const useHex = it.writeColorHex || it.colorHex;
       swatches.push({ id: it.id, name: it.name, colorHex: useHex, parent: it, isSetColor: false });
     }
