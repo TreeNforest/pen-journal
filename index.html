@@ -490,6 +490,7 @@ function SetColorsView({ item, onUpdateColors, onEditBox, onClose }) {
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
   const [hex, setHex] = useState('#C1432E');
+  const [chartMode, setChartMode] = useState(false);
 
   const addColor = () => {
     if (!name.trim()) return;
@@ -513,8 +514,15 @@ function SetColorsView({ item, onUpdateColors, onEditBox, onClose }) {
         <div style={{ fontSize: 12.5, color: 'var(--ink-soft)', marginBottom: 14 }}>
           {item.brand}{item.brand ? ' · ' : ''}{colors.length} 色
           <span style={{ marginLeft: 10, textDecoration: 'underline', cursor: 'pointer' }} onClick={onEditBox}>編輯盒子基本資料</span>
+          <span style={{ marginLeft: 10, textDecoration: 'underline', cursor: 'pointer' }} onClick={() => setChartMode(m => !m)}>
+            {chartMode ? '返回編輯清單' : '色卡檢視'}
+          </span>
         </div>
 
+        {chartMode ? (
+          <ColorChartView colors={colors} />
+        ) : (
+        <React.Fragment>
         <div className="field">
           <label>新增顏色</label>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -542,11 +550,52 @@ function SetColorsView({ item, onUpdateColors, onEditBox, onClose }) {
             </div>
           ))}
         </div>
+        </React.Fragment>
+        )}
 
         <div className="modal-actions">
           <button className="btn btn-primary" style={{ flex: 1 }} onClick={onClose}>完成</button>
         </div>
       </div>
+    </div>
+  );
+}
+
+const FAMILY_ORDER = ['red', 'orange', 'yellow', 'yellowgreen', 'green', 'teal', 'blue', 'purple', 'magenta', 'neutral'];
+const FAMILY_LABELS = { red: '紅', orange: '橙', yellow: '黃', yellowgreen: '黃綠', green: '綠', teal: '藍綠', blue: '藍', purple: '紫', magenta: '桃紫', neutral: '中性' };
+
+function ColorChartView({ colors }) {
+  if (colors.length === 0) {
+    return <div style={{ fontSize: 13, color: 'var(--ink-soft)', textAlign: 'center', padding: '30px 0' }}>還沒有顏色可以排色卡</div>;
+  }
+  const groups = {};
+  for (const c of colors) {
+    const key = getColorFamilyKey(c.colorHex);
+    (groups[key] = groups[key] || []).push(c);
+  }
+  for (const key of Object.keys(groups)) {
+    groups[key].sort((a, b) => hexToHSL(b.colorHex).l - hexToHSL(a.colorHex).l);
+  }
+  const nonEmpty = FAMILY_ORDER.filter(k => groups[k] && groups[k].length > 0);
+
+  return (
+    <div style={{ display: 'flex', overflowX: 'auto', paddingBottom: 10, gap: 14 }}>
+      {nonEmpty.map(key => (
+        <div key={key} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
+          <div style={{ fontSize: 11, color: 'var(--ink-soft)', marginBottom: 6 }}>{FAMILY_LABELS[key]}</div>
+          <div style={{ display: 'flex' }}>
+            {groups[key].map(c => (
+              <div key={c.id} style={{ width: 26, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <div style={{ width: 26, height: 150, background: c.colorHex, border: '1px solid var(--line)' }}></div>
+                <div className="mono" style={{
+                  writingMode: 'vertical-rl', fontSize: 9, marginTop: 6, color: 'var(--ink-soft)',
+                  maxHeight: 80, overflow: 'hidden', textOverflow: 'ellipsis'
+                }}>{c.code || c.name}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
