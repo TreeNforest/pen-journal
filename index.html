@@ -21,6 +21,13 @@
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
 <style>
+  @font-face {
+    font-family: 'CreamFont';
+    src: url('./creamfont-3.3.otf') format('opentype');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+  }
   :root {
     --paper: #F6F1E7;
     --paper-raised: #FDFBF6;
@@ -51,11 +58,11 @@
     margin: 0;
     background: var(--paper);
     color: var(--ink);
-    font-family: 'Inter', sans-serif;
+    font-family: 'CreamFont', 'Inter', sans-serif;
     -webkit-font-smoothing: antialiased;
     transition: background 0.2s ease, color 0.2s ease;
   }
-  .display { font-family: 'Fraunces', serif; }
+  .display { font-family: 'CreamFont', 'Fraunces', serif; }
   .mono { font-family: 'IBM Plex Mono', monospace; }
 
   #root { min-height: 100vh; }
